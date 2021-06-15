@@ -1,1 +1,221 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.all;
+use IEEE.STD_LOGIC_UNSIGNED.all;
+
+
+entity processor is
+port(
+	Clk         : in  std_logic;
+	Reset       : in  std_logic;
+	-- Instruction memory
+	I_Addr      : out std_logic_vector(31 downto 0);
+	I_RdStb     : out std_logic;
+	I_WrStb     : out std_logic;
+	I_DataOut   : out std_logic_vector(31 downto 0);
+	I_DataIn    : in  std_logic_vector(31 downto 0);
+	-- Data memory
+	D_Addr      : out std_logic_vector(31 downto 0);
+	D_RdStb     : out std_logic;
+	D_WrStb     : out std_logic;
+	D_DataOut   : out std_logic_vector(31 downto 0);
+	D_DataIn    : in  std_logic_vector(31 downto 0)
+);
+end processor;
+
+architecture processor_arq of processor is 
+--primer etapa
+signal PC:std_logic_vector(31 downto 0);
+signal PC_Next:std_logic_vector(31 downto 0); --pc+4
+signal Dir_Jump:std_logic_vector(31 downto 0); --direccion de salto
+signal PCSrc:std_logic; --controla el multiplexor de la proxima instruccion salto o no
+signal IF_ID_PC_4:std_logic_vector(31 downto 0); --cable al reg de segmentacion del pc
+signal IF_ID_I_DataIn:std_logic_vector(31 downto 0); --cable al reg de segmentacion de la entrada de datos
+
+--segunda etapa
+
+signal WEB_Write_data:std_logic_vector(31 downto 0);-- resultado del ultimo mux
+signal UC_WB:std_logic_vector(1 downto 0);-- señales de ctrl para writeback
+signal UC_M:std_logic_vector(2 downto 0);-- señales de ctrl para memory
+signal UC_EX:std_logic_vector(4 downto 0);-- 3+1+1 -- señales de ctrl para execute
+signal ID_EX_read_data_1:STD_LOGIC_VECTOR (31 downto 0);--salida 1 del br
+signal ID_EX_read_data_2:STD_LOGIC_VECTOR (31 downto 0);--salida 2 del br
+signal Inmediato_Extendido:STD_LOGIC_VECTOR (31 downto 0);
+
+--tercera etapa
+signal Direccion_Reg_Escritura:STD_LOGIC_VECTOR (4 downto 0);--salida de un mux que selecciona la direccion de escritura
+signal Operacion_Alu:std_logic_vector (2 downto 0);--cable que entra al alu e indica que hacer
+signal Resultado_Alu:std_logic_vector (31 downto 0);
+signal Zero_Alu:std_logic;
+signal Salida_Mux_Alu:std_logic_vector (31 downto 0);--segunda entrada a la alu
+--cuarta etapa
+
+
+
+component regs 
+    Port ( reg1_rd : in STD_LOGIC_VECTOR (4 downto 0);
+           reg2_rd : in STD_LOGIC_VECTOR (4 downto 0);
+           reg_wr : in STD_LOGIC_VECTOR (4 downto 0);
+           data_wr : in STD_LOGIC_VECTOR (31 downto 0);
+           wr : in STD_LOGIC;
+           clk : in STD_LOGIC;
+           reset : in STD_LOGIC;
+           data1_rd : out STD_LOGIC_VECTOR (31 downto 0);
+           data2_rd : out STD_LOGIC_VECTOR (31 downto 0));
+end component;
+
+component alu
+   Port ( a : in STD_LOGIC_VECTOR (31 downto 0);
+           b : in STD_LOGIC_VECTOR (31 downto 0);
+           sel : in STD_LOGIC_VECTOR (2 downto 0);
+           result : out STD_LOGIC_VECTOR (31 downto 0);
+           zero : out STD_LOGIC);
+end component;
+
+
+begin 	
+    process(Clk,Reset)
+    begin
+        PC_Next<=PC+4;
+        if Reset='1' then
+            PC<=x"00000000";
+        elsif rising_edge(Clk) then 
+            if (PCSrc='0') then
+                PC<=PC_Next;
+            else
+                PC<=Dir_Jump;
+            end if;
+        end if;
+        I_Addr<=PC;
+        I_RdStb<='1';
+        I_WrStb<='0';
+        I_DataOut<=x"00000000";
+        
+     end process;
+     
+    process(Clk, Reset)
+    begin
+        if Reset='1' then
+            IF_ID_PC_4<=x"00000000";
+            IF_ID_I_DataIn<=x"00000000";
+        elsif (rising_edge(Clk)) then
+            IF_ID_PC_4<=PC_Next;
+            IF_ID_I_DataIn<=I_DataIn;
+        end if;
+     end process;
+     
+----------------------------------------------------------------------------------
+
+Banco_Registros:regs port map(
+    reset=>reset,
+    clk=>clk,
+    reg1_rd=>IF_ID_I_DataIn(25 downto 21),--direccion primer registro de lectura
+    reg2_rd=>IF_ID_I_DataIn(20 downto 16),--direccion segundo registro de lectura
+    reg_wr=>Direccion_Reg_Escritura,--direccion de escritura 
+    data_wr=>WEB_Write_data,--datos para escribir
+    wr=>UC_WB(0),--señal de un bit de habilitacion de escritura al br REVISAR
+    data1_rd=>ID_EX_read_data_1,
+    data2_rd=>ID_EX_read_data_2);
+    
+
+    Inmediato_Extendido<=x"0000" & IF_ID_I_DataIn(15 downto 0) when (IF_ID_I_DataIn(15)='0') else (x"FFFF" & IF_ID_I_DataIn(15 downto 0));--extension de signo duda
+    --REVISAR
+     Control: process(IF_ID_I_DataIn)
+        begin
+            case IF_ID_I_DataIn(31 downto 26) is
+            --tomo las señales de special de las instrucciones
+            --wb: memtoreg regwrite
+            --m: memwrite memread saltoBranch
+            --ex: regdst alusrc aluop
+            
+                when "000000"=> --tipo r
+                    UC_WB<="01"; --mux en 0 regwrite en 1 
+                    UC_M<="000"; --no uso branch y el data memory
+                    UC_EX<="10010";--guardo resultado en 15-11 no tomo inm alusrc=0 tipo r 010
+                when "100011"=> --lw
+                    UC_WB<="11";--mux en 1 leo el datamemory y escribo en br
+                    UC_M<="010";-- no escribo, leo, no salto
+                    UC_EX<="01000";--guardo en 20-16,  alusrc=1 tomo el inm, 000 para sw
+                when "101011"=>--sw
+                    UC_WB<="00";--guardo en el data memory no escribo en el br
+                    UC_M<="100";--escribo, no leo, no salto
+                    UC_EX<="01000";--no escribo en br, alusrc=1 tomo el inm, 000 para lw
+                when "000100"=>--beq
+                    UC_WB<="00";--salto no escribo en el br
+                    UC_M<="001";--no escribo, no leo, salto
+                    UC_EX<="00001";--no escribo en br, alusrc=0 tomo del br, 110 para beq
+                when "001111"=>--lui
+                    UC_WB<="01";--deberia ir el mux en 0 y al memwrite tambien
+                    UC_M<="000";--no escribo, no leo, no salto
+                    UC_EX<="01111";--0 escribo en 20-16, alusrc=1 tomo el inm, 111 lui
+                    --la alu no deberia hacer nada en esta instruccion
+                when "001000"=>--addi
+                    UC_WB<="01";--mux en 0 regwrite en 1 
+                    UC_M<="000";--no escribo, no leo, no salto
+                    UC_EX<="01110";--0 escribo en 20-16, alusrc=1 tomo el inm, 000 addi
+                when "001100"=>--andi
+                    UC_WB<="01";--mux en 0 regwrite en 1 
+                    UC_M<="000";--no escribo, no leo, no salto
+                    UC_EX<="01100";--0 escribo en 20-16, alusrc=1 tomo el inm, 100 andi
+                when "001101"=>--ori
+                    UC_WB<="01";--mux en 0 regwrite en 1 
+                    UC_M<="000";--no escribo, no leo, no salto
+                    UC_EX<="01101";--0 escribo en 20-16, alusrc=1 tomo el inm, 101 ori
+                when others=>--otros
+                    UC_WB<=(others=>'0');
+                    UC_M<=(others=>'0');
+                    UC_EX<=(others=>'0');
+            end case;
+        end process;
+ ------------------------------------------------       
+        
+        Direccion_Reg_Escritura<=IF_ID_I_DataIn(20 downto 16) when
+                UC_EX(4)='0' else IF_ID_I_DataIn(15 downto 11);
+                
+        Salida_Mux_Alu<=Inmediato_Extendido when UC_EX(3)='1'
+                else ID_EX_read_data_2;
+        
+        Alu_Control:process(UC_EX,Inmediato_Extendido)
+        begin
+            case UC_EX(2 downto 0) is
+                when "010"=>
+                    case Inmediato_Extendido(5 downto 0) is
+                        when "100100"=>Operacion_Alu<="000";--and
+                        when "100101"=>Operacion_Alu<="001";--or
+                        when "100000"=>Operacion_Alu<="010";--add
+                        when "100010"=>Operacion_Alu<="110";--sub
+                        when "101010"=>Operacion_Alu<="111";--slt
+                        when others=>Operacion_Alu<="011";
+                    end case;
+                when "000" => Operacion_Alu<="010";--lw sw son add
+                when "001" => Operacion_Alu<="110";--beq
+                when "111" => Operacion_Alu<="100";--lui
+                when "110" => Operacion_Alu<="010";--addi
+                when "100" => Operacion_Alu<="000";--andi
+                when "101" => Operacion_Alu<="001";--ori
+                when others=> Operacion_Alu<="011";--otros
+            end case;
+        end process;
+        
+        
+        
+        Unidad_Aritmetico_Logica: alu port map(
+            a=>ID_EX_read_data_1,
+            b=> Salida_Mux_Alu,
+            sel=>Operacion_Alu,
+            result=>Resultado_Alu,
+            zero=>Zero_Alu);
+            
+        Dir_Jump<=PC_Next+(Inmediato_Extendido(29 downto 0)&"00");
+ ---------------------------------------------------------------------
+         
+       PCSrc<=Zero_Alu and UC_M(0);
+       D_Addr<= Resultado_Alu;     
+	   D_RdStb <= UC_M(1);   
+	   D_WrStb <= UC_M(2);
+	   ID_EX_read_data_2 <=D_DataIn;--revisar
+	   Aux_D_DataOut<=D_DataOut;
+	   WEB_Write_data<=Aux_D_DataOut when UC_WB(1)='1' else Resultado_Alu;
+        
+        
+end processor_arq;
 
