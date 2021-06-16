@@ -1,0 +1,47 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+use ieee.std_logic_unsigned.all;
+
+
+-- Uncomment the following library declaration if instantiating
+-- any Xilinx leaf cells in this code.
+--library UNISIM;
+--use UNISIM.VComponents.all;
+
+entity regs is
+    Port ( reg1_rd : in STD_LOGIC_VECTOR (4 downto 0);
+           reg2_rd : in STD_LOGIC_VECTOR (4 downto 0);
+           reg_wr : in STD_LOGIC_VECTOR (4 downto 0);
+           data_wr : in STD_LOGIC_VECTOR (31 downto 0);
+           wr : in STD_LOGIC;
+           clk : in STD_LOGIC;
+           reset : in STD_LOGIC;
+           data1_rd : out STD_LOGIC_VECTOR (31 downto 0);
+           data2_rd : out STD_LOGIC_VECTOR (31 downto 0));
+end regs;
+
+architecture Behavioral of regs is
+
+type T_REG is array(0 to 31) of STD_LOGIC_VECTOR(31 downto 0) ; 
+signal reg:T_REG;
+
+begin
+    process(clk,reset)
+    begin
+        if(reset='1') then
+            reg<=(others=>x"00000000");
+        elsif(falling_edge(clk)) then
+            if(wr = '1') then
+                reg(CONV_INTEGER(reg_wr))<=data_wr;
+            end if;
+         end if; 
+     end process; 
+
+     data1_rd <= x"00000000" when (reg1_rd = x"0000")
+     else reg(conv_integer(reg1_rd));
+     data2_rd<= x"00000000" when (reg2_rd = x"0000")
+     else reg(conv_integer(reg2_rd));
+
+
+end Behavioral;
