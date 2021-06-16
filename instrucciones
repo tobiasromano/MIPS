@@ -1,0 +1,15 @@
+8c090000 lw base=0 rt=9 offset=0 rt ← memory[base+offset]
+8c0a0004 lw base=0 rt=10 offset=4 rt ← memory[base+offset]
+8c0b0008 lw base=0 rt=11 offset=8  rt ← memory[base+offset]
+8c0c000c lw base=0 rt=12 offset=12 rt ← memory[base+offset]
+8c0d0010 lw base=0 rt=13 offset=16 rt ← memory[base+offset]
+8c0e0014 lw base=0 rt=14 offset=20 rt ← memory[base+offset]
+ac090018 sw base=0 rt=9 offset=24 memory[base+offset] ← rt
+ac0a001c sw base=0 rt=10 offset=28 memory[base+offset] ← rt
+ac0b0020 sw base=0 rt=11 offset=32 memory[base+offset] ← rt
+ac0c0024 sw base=0 rt=12 offset=36 memory[base+offset] ← rt
+ac0d0028 sw base=0 rt=13 offset=40 memory[base+offset] ← rt
+ac0e002c sw base=0 rt=14 offset=44 memory[base+offset] ← rt
+8c090018 lw base=0 rt=9 offset=24 rt ← memory[base+offset]
+8c0a001c lw base=0 rt=10 offset=28 rt ← memory[base+offset]
+8c0b0020 lw base=0 rt=11 offset=32 rt ← memory[base+offset]
