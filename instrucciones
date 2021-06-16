@@ -13,3 +13,22 @@ ac0e002c sw base=0 rt=14 offset=44 memory[base+offset] ← rt
 8c090018 lw base=0 rt=9 offset=24 rt ← memory[base+offset]
 8c0a001c lw base=0 rt=10 offset=28 rt ← memory[base+offset]
 8c0b0020 lw base=0 rt=11 offset=32 rt ← memory[base+offset]
+----
+8c0c0024	100011(Lw) 00000(Base = 0) 01100(Rt = 12)  0000000000100100(Offset = 36) rt ← memory[base+offset]
+8c0d0028	100011(Lw) 00000(Base = 0) 01101(Rt = 13)  0000000000101000(Offset = 40) rt ← memory[base+offset]
+8c0e002c	100011(Lw) 00000(Base = 0) 01110(Rt = 14)  0000000000101100(Offset = 44) rt ← memory[base+offset]	
+012a7820	000000(Tipo R) 01001(Rs = 9) 01010(Rt = 10)  01111(Rd = 15) 00000 100000(Add) rd ← rs + rt
+016c8020	000000(Tipo R) 01011(Rs = 11) 01100(Rt = 12) 10000(Rd = 16) 00000 100000(Add) rd ← rs + rt
+01a98822	000000(Tipo R) 01101(Rs = 13) 01001(Rt = 9)  10001(Rd = 17) 00000 100010(Sub) rd ← rs - rt
+01ca9022	000000(Tipo R) 01110(Rs = 14) 01010(Rt = 10) 10010(Rd = 18) 00000 100010(Sub) rd ← rs - rt
+012a9824	000000(Tipo R) 01001(Rs = 9) 01010(Rt = 10)  10011(Rd = 19) 00000 100100(And) rd ← rs AND rt
+01eaa024	000000(Tipo R) 01111(Rs = 15) 01010(Rt = 10) 10100(Rd = 19) 00000 100100(And) rd ← rs AND rt
+012aa825	000000(Tipo R) 01001(Rs = 9) 01010(Rt = 10)  10101(Rd = 21) 00000 100101(Or)  rd ← rs OR rt
+020ab025	000000(Tipo R) 10000(Rs = 16) 01010(Rt = 10) 10110(Rd = 22) 00000 100101(Or)  rd ← rs OR rt
+012ab82a	000000(Tipo R) 01001(Rs = 9) 01010(Rt = 10)  10111(Rd = 23) 00000 101010(Slt) rd ← (rs < rt)
+020ac02a	000000(Tipo R) 10000(Rs = 16) 01010(Rt = 10) 11000(Rd = 24) 00000 101010(Slt) rd ← (rs < rt)
+3c090001	001111(LUI) 00000 01001(Rt = 9)  0000000000000001(Inmediate = 1)  rt ← immediate & 0^16 (rt ← immediate << 16) 
+3c0a0002	001111(LUI) 00000 01010(Rt = 10) 0000000000000010(Inmediate = 2)  rt ← immediate & 0^16 (rt ← immediate << 16)	
+216b0006	001000(ADDI) 01011(Rs = 11) 01011(Rt = 11) 0000000000000110(Inmediate = 6)    rt ← rs + SIGN_EXTEND(immediate) 
+358c0070	001101(ORI) 01100(Rs = 12) 01100(Rt = 12) 0000000001110000(Inmediate = 112)  rt ← rs OR SIGN_EXTEND(immediate) 
+31ef0002	001100(ANDI) 01111(Rs = 15) 01111(Rt = 15) 0000000000000010(Inmediate = 2)  rt ← rs AND SIGN_EXTEND(immediate)
