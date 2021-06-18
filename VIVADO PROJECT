@@ -30,6 +30,7 @@ signal Dir_Jump:std_logic_vector(31 downto 0); --direccion de salto
 signal PCSrc:std_logic; --sel de salto o no, sale de and
 signal IF_ID_PC_4:std_logic_vector(31 downto 0); --reg de segm pc+4
 signal IF_ID_I_DataIn:std_logic_vector(31 downto 0); --reg de segm tiene la instruccion
+signal PC_Mux:std_logic_vector(31 downto 0);
 
 --segunda etapa
 signal ID_EX_read_data_1:std_logic_vector(31 downto 0);
@@ -44,11 +45,13 @@ signal ID_EX_PC_4:std_logic_vector(31 downto 0);
 
 
 
-signal ID_EX_DataIn:std_logic_vector(31 downto 0);
+
 signal WEB_Write_data:std_logic_vector(31 downto 0);-- resultado del ultimo mux
 signal UC_WB:std_logic_vector(1 downto 0);-- señales de ctrl para writeback
 signal UC_M:std_logic_vector(2 downto 0);-- señales de ctrl para memory
 signal UC_EX:std_logic_vector(4 downto 0);-- 3+1+1 -- señales de ctrl para execute
+
+signal Sign_Extend:std_logic_vector(31 downto 0);
 
 
 signal read_data_1:STD_LOGIC_VECTOR (31 downto 0);--salida 1 del br
@@ -103,33 +106,27 @@ end component;
 
 
 begin 	
----primera etapa if/id 
+---primera etapa if 
+
     PC_Next<=PC+4;
-    process(Clk,Reset)--registro de pipeline IF_ID
-    begin
-        if Reset='1' then
-            PC<=x"00000000";
-        elsif rising_edge(Clk) then 
-                
-            if (PCSrc='0') then
-                PC<=PC_Next;
-            else
-                PC<=Dir_Jump;
-            end if;
-        end if;
-        I_Addr<=PC;
-        I_RdStb<='1';
-        I_WrStb<='0';
-        I_DataOut<=x"00000000";
-        
-     end process;
+    I_Addr<=PC;
+    I_RdStb<='1';
+    I_WrStb<='0';
+    I_DataOut<=x"00000000";
+    
+
+
+    PC_Mux<=PC_Next when PCSrc='0' else Dir_Jump;
+     
      
     process(Clk, Reset)
     begin
         if Reset='1' then
+            PC<=x"00000000";
             IF_ID_PC_4<=x"00000000";
             IF_ID_I_DataIn<=x"00000000";
         elsif (rising_edge(Clk)) then
+            PC<=PC_Mux;
             IF_ID_PC_4<=PC_Next;
             IF_ID_I_DataIn<=I_DataIn;
         end if;
@@ -144,11 +141,14 @@ Banco_Registros:regs port map(
     reg2_rd=>IF_ID_I_DataIn(20 downto 16),--direccion segundo registro de lectura
     reg_wr=>MEM_WB_Registro_Escritura,--direccion de escritura 
     data_wr=>WEB_Write_data,--datos para escribir
-    wr=>MEM_WB_WB(0),--señal de un bit de habilitacion de escritura al br REVISAR
+    wr=>MEM_WB_WB(0), --wb: memtoreg regwrite
     data1_rd=>read_data_1,
     data2_rd=>read_data_2);
     
-
+    Sign_Extend<=x"0000" & IF_ID_I_DataIn(15 downto 0) when IF_ID_I_DataIn(15)='0' else
+        x"ffff" & IF_ID_I_DataIn(15 downto 0);
+    
+    
     
     process(Clk, Reset) --registro de pipeline ID_EX
     begin
@@ -158,7 +158,6 @@ Banco_Registros:regs port map(
             ID_EX_Inmediato_Extendido<=x"00000000";
             ID_EX_20_16_reg<="00000";
             ID_EX_15_11_reg<="00000";
-            ID_EX_DataIn<=x"00000000";--pc
             ID_EX_PC_4<=x"00000000";--pc+4
             ID_EX_WB<="00";
             ID_EX_M<="000";
@@ -167,14 +166,9 @@ Banco_Registros:regs port map(
          elsif rising_edge(Clk) then
             ID_EX_read_data_1<=read_data_1;
             ID_EX_read_data_2<=read_data_2;
-            if (IF_ID_I_DataIn(15)='0') then
-                ID_EX_Inmediato_Extendido<= x"0000" & IF_ID_I_DataIn(15 downto 0);
-            elsif (IF_ID_I_DataIn(15)='1') then
-                ID_EX_Inmediato_Extendido <= ("1000" & x"000" & "0" & IF_ID_I_DataIn(14 downto 0));
-            end if;
+            ID_EX_Inmediato_Extendido<=Sign_Extend;
             ID_EX_20_16_reg<=IF_ID_I_DataIn(20 downto 16);
             ID_EX_15_11_reg<=IF_ID_I_DataIn(15 downto 11);
-            ID_EX_DataIn<=IF_ID_I_DataIn;--instruccion actual
             ID_EX_PC_4<=IF_ID_PC_4;
             ID_EX_WB<=UC_WB;
             ID_EX_M<=UC_M;
@@ -306,7 +300,7 @@ Banco_Registros:regs port map(
             elsif rising_edge(Clk) then
                 MEM_WB_Registro_Escritura<=EX_MEM_Registro_Escritura;
                 MEM_WB_WB<=EX_MEM_WB;
-                MEM_WB_Read_Data<=D_DataIn;--
+                MEM_WB_Read_Data<=D_DataIn;
                 MEM_WB_Resultado_Alu<=EX_MEM_Resultado_Alu;
             end if;
         end process;
@@ -315,12 +309,15 @@ Banco_Registros:regs port map(
        D_Addr<= EX_MEM_Resultado_Alu;     
 	   D_RdStb <= EX_MEM_M(1);   
 	   D_WrStb <= EX_MEM_M(2);
-
-	   D_DataOut<= EX_MEM_read_data_2;--
+	   D_DataOut<= EX_MEM_read_data_2;
 	   
 --quinta etapa wb
 
 	   WEB_Write_data<=MEM_WB_Read_Data when MEM_WB_WB(1)='1'
 	        else MEM_WB_Resultado_Alu;
+	    
+        
+        
+end processor_arq;
 	    
         
