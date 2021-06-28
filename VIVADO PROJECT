@@ -116,8 +116,9 @@ begin
     
 
 
-    PC_Mux<=PC_Next when PCSrc='0' else Dir_Jump;
-     
+    PC_Mux<=PC_Next when PCSrc='0' else EX_MEM_Direccion_Salto;
+    
+    
      
     process(Clk, Reset)
     begin
@@ -232,7 +233,7 @@ Banco_Registros:regs port map(
         Salida_Mux_Alu<=ID_EX_Inmediato_Extendido when UC_EX(3)='1'
                 else ID_EX_read_data_2;
                 
-        Dir_Jump<=PC_Next+(ID_EX_Inmediato_Extendido(29 downto 0)&"00");
+        Dir_Jump<=ID_EX_PC_4+(ID_EX_Inmediato_Extendido(29 downto 0)&"00");
         
         Alu_Control:process(ID_EX_EX,ID_EX_Inmediato_Extendido)
         begin
@@ -316,8 +317,3 @@ Banco_Registros:regs port map(
 	   WEB_Write_data<=MEM_WB_Read_Data when MEM_WB_WB(1)='1'
 	        else MEM_WB_Resultado_Alu;
 	    
-        
-        
-end processor_arq;
-	    
-        
