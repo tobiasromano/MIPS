@@ -316,4 +316,4 @@ Banco_Registros:regs port map(
 
 	   WEB_Write_data<=MEM_WB_Read_Data when MEM_WB_WB(1)='1'
 	        else MEM_WB_Resultado_Alu;
-	    
+end processor_arq;
